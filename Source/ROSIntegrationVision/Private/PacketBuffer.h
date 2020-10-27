@@ -43,7 +43,6 @@ public:
   {
     uint32_t Size; // Size of the complete packet
     uint32_t SizeHeader; // Size of the header
-    uint32_t MapEntries; // Number of map entries at the end of the packet
     uint32_t Width; // Width of the images
     uint32_t Height; // Height of the images
     uint64_t TimestampCapture; // Timestamp from capture
@@ -54,16 +53,6 @@ public:
     Quaternion Rotation; // Rotation of the camera for current frame
   };
 
-  struct MapEntry
-  {
-    uint32_t Size; // Size of the complete map entry
-    uint8_t R; // Red channel
-    uint8_t G; // Green channel
-    uint8_t B; // Blue channel
-    char FirstChar; // Position of the first character, Size - 7 Bytes in total
-  };
-
-
 private:
   std::vector<uint8> ReadBuffer, WriteBuffer;
   bool IsDataReadable;
@@ -72,21 +61,18 @@ private:
 
 public:
   // Sizes of the Header, the raw color and depth image data
-  const uint32 SizeHeader, SizeRGB, SizeFloat;
+  const uint32 SizeHeader, SizeRGB;
   // Offsets for the images and map entries in the packet buffer
-  const uint32 OffsetColor, OffsetDepth, OffsetObject, OffsetMap;
+  const uint32 OffsetColor;
   // Size of the complete packet
   const uint32 Size;
   // Pointers to the beginning of the images and map for writing and a pointer to the beginning of a completed packet for reading
-  uint8 *Color, *Depth, *Object, *Map, *Read;
+  uint8 *Color, *Read;
   // Pointer to the packet headers
   PacketHeader *HeaderWrite, *HeaderRead;
 
   // Initializes the buffer, widht and height are not changeable afterwards
   PacketBuffer(const uint32 Width, const uint32 Height, const float FieldOfView);
-
-  // Starts writing and copies the map entries to the end of the packet.
-  void StartWriting(const TMap<FString, uint32> &ObjectToColor, const TArray<FColor> &ObjectColors);
 
   // Swaps reading and writing buffer and unblocks the reading thread
   void DoneWriting();

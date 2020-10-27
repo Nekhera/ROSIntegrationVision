@@ -40,24 +40,25 @@ public:
   // The cameras for color, depth and objects;
   UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = "Vision Component")
     USceneCaptureComponent2D * Color;
-  UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = "Vision Component")
-  	USceneCaptureComponent2D * Depth;
-  UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = "Vision Component")
-    USceneCaptureComponent2D * Object;
   
   UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
     FString ImageFrame = TEXT("/unreal_ros/image_frame");
   UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
     FString ImageOpticalFrame = TEXT("/unreal_ros/image_optical_frame");
+
+  UPROPERTY(EditAnywhere, Category = "Vision Component")
+    FString CameraInfoTopicName = TEXT("/unreal_ros/camera_info");
+  UPROPERTY(EditAnywhere, Category = "Vision Component")
+    FString ImageTopicName = TEXT("/unreal_ros/image_color");
+  UPROPERTY(EditAnywhere, Category = "Vision Component")
+    FString TFTopicName = TEXT("/tf");
     
   UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
     UTopic * CameraInfoPublisher;
   UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-    UTopic * DepthPublisher;
+    UTopic * ImagePublisher;
   UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-   UTopic * ImagePublisher;
-  UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-   UTopic * TFPublisher;
+    UTopic * TFPublisher;
 
 protected:
   
@@ -72,17 +73,14 @@ protected:
 
 private:
     
-	// Private data container
-	class PrivateData;
-	PrivateData *Priv;
+  // Private data container
+  class PrivateData;
+  PrivateData *Priv;
 
-	UMaterialInstanceDynamic *MaterialDepthInstance;
+  UMaterialInstanceDynamic *MaterialDepthInstance;
   
-  TArray<FFloat16Color> ImageColor, ImageDepth, ImageObject;
-  TArray<uint8> DataColor, DataDepth, DataObject;
-  TArray<FColor> ObjectColors;
-  TMap<FString, uint32> ObjectToColor;
-  uint32 ColorsUsed;
+  TArray<FFloat16Color> ImageColor;
+  TArray<uint8> DataColor;
   bool Running, Paused;
   
   void ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const;
@@ -91,15 +89,7 @@ private:
   void ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
   void ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
   void ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const;
-  void ToDepthImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const;
   void StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const;
-  void GenerateColors(const uint32_t NumberOfColors);
-  bool ColorObject(AActor *Actor, const FString &name);
-  bool ColorAllObjects();
   void ProcessColor();
-  void ProcessDepth();
-  void ProcessObject();
 
-  // in must hold Width*Height*2(float) Bytes
-  void convertDepth(const uint16_t *in, __m128 *out) const;
 };
