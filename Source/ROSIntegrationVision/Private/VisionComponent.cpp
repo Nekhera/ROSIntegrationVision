@@ -59,6 +59,7 @@ TimePassed(0)
         Color->SetupAttachment(this);
         Color->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
         Color->TextureTarget = CreateDefaultSubobject<UTextureRenderTarget2D>(TEXT("ColorTarget"));
+		Color->TextureTarget->TargetGamma = 2.0;
         Color->TextureTarget->InitAutoFormat(Width, Height);
         Color->FOVAngle = FieldOfView;
     }
