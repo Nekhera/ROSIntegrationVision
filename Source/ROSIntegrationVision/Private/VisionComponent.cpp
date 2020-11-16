@@ -169,18 +169,18 @@ void UVisionComponent::TickComponent(float DeltaTime,
 	owner->UpdateComponentTransforms();
 
 	FDateTime Now = FDateTime::UtcNow();
-	Priv->Buffer->HeaderWrite->TimestampCapture = Now.ToUnixTimestamp() * 1000000000 + Now.GetMillisecond() * 1000000;
+	Priv->Buffer->Header->TimestampCapture = Now.ToUnixTimestamp() * 1000000000 + Now.GetMillisecond() * 1000000;
 
 	FVector Translation = GetComponentLocation();
 	FQuat Rotation = GetComponentQuat();
 	// Convert to meters and ROS coordinate system
-	Priv->Buffer->HeaderWrite->Translation.X = Translation.X / 100.0f;
-	Priv->Buffer->HeaderWrite->Translation.Y = -Translation.Y / 100.0f;
-	Priv->Buffer->HeaderWrite->Translation.Z = Translation.Z / 100.0f;
-	Priv->Buffer->HeaderWrite->Rotation.X = -Rotation.X;
-	Priv->Buffer->HeaderWrite->Rotation.Y = Rotation.Y;
-	Priv->Buffer->HeaderWrite->Rotation.Z = -Rotation.Z;
-	Priv->Buffer->HeaderWrite->Rotation.W = Rotation.W;
+	Priv->Buffer->Header->Translation.X = Translation.X / 100.0f;
+	Priv->Buffer->Header->Translation.Y = -Translation.Y / 100.0f;
+	Priv->Buffer->Header->Translation.Z = Translation.Z / 100.0f;
+	Priv->Buffer->Header->Rotation.X = -Rotation.X;
+	Priv->Buffer->Header->Rotation.Y = Rotation.Y;
+	Priv->Buffer->Header->Rotation.Z = -Rotation.Z;
+	Priv->Buffer->Header->Rotation.W = Rotation.W;
 
 	// Read color image and notify processing thread
 	Priv->WaitColor.lock();
@@ -190,20 +190,14 @@ void UVisionComponent::TickComponent(float DeltaTime,
 	Priv->CVColor.notify_one();
 
 	Priv->Buffer->StartReading();
-	uint32_t xSize = Priv->Buffer->HeaderRead->Size;
-	uint32_t xSizeHeader = Priv->Buffer->HeaderRead->SizeHeader; // Size of the header
-	uint32_t xWidth = Priv->Buffer->HeaderRead->Width; // Width of the images
-	uint32_t xHeight = Priv->Buffer->HeaderRead->Height; // Height of the images
+	uint32_t xSize = Priv->Buffer->Header->Size;
+	uint32_t xSizeHeader = Priv->Buffer->Header->SizeHeader; // Size of the header
+	uint32_t xWidth = Priv->Buffer->Header->Width; // Width of the images
+	uint32_t xHeight = Priv->Buffer->Header->Height; // Height of the images
 
 	// Get the data offsets for the different types of images that are in the buffer
 	const uint32_t& OffsetColor = Priv->Buffer->OffsetColor;
-
-	// * - Depth image data (width * height * 2 Bytes (Float16))
-	uint32_t TargetDepthBufSize = Width*Height * 4;
-	uint8_t* TargetDepthBuf = new uint8_t[TargetDepthBufSize]; // Allocate a byte for every pixel * 4 Bytes for a single 32Bit Float
-
 	const uint32_t ColorImageSize = Width * Height * 3;
-	// convertDepth((uint16_t *)packet.pDepth, (__m128*)&msgDepth->data[0]);
 
 	UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetColor);
 
@@ -218,25 +212,25 @@ void UVisionComponent::TickComponent(float DeltaTime,
 	ImageMessage->width = Width;
 	ImageMessage->encoding = TEXT("bgr8");
 	ImageMessage->step = Width * 3;
-	ImageMessage->data = &Priv->Buffer->Read[OffsetColor];
+	ImageMessage->data = &Priv->Buffer->Color[0];
 	ImagePublisher->Publish(ImageMessage);
 
 	Priv->Buffer->DoneReading();
 
-	double x = Priv->Buffer->HeaderRead->Translation.X;
-	double y = Priv->Buffer->HeaderRead->Translation.Y;
-	double z = Priv->Buffer->HeaderRead->Translation.Z;
-	double rx = Priv->Buffer->HeaderRead->Rotation.X;
-	double ry = Priv->Buffer->HeaderRead->Rotation.Y;
-	double rz = Priv->Buffer->HeaderRead->Rotation.Z;
-	double rw = Priv->Buffer->HeaderRead->Rotation.W;
+	double x = Priv->Buffer->Header->Translation.X;
+	double y = Priv->Buffer->Header->Translation.Y;
+	double z = Priv->Buffer->Header->Translation.Z;
+	double rx = Priv->Buffer->Header->Rotation.X;
+	double ry = Priv->Buffer->Header->Rotation.Y;
+	double rz = Priv->Buffer->Header->Rotation.Z;
+	double rw = Priv->Buffer->Header->Rotation.W;
 
 	if (!DisableTFPublishing) {
-    // Start advertising TF only if it has yet to advertise.
-    if (!TFPublisher->IsAdvertising())
-    {
-      TFPublisher->Advertise();
-    }
+		// Start advertising TF only if it has yet to advertise.
+		if (!TFPublisher->IsAdvertising())
+		{
+		TFPublisher->Advertise();
+		}
 		TSharedPtr<ROSMessages::tf2_msgs::TFMessage> TFImageFrame(new ROSMessages::tf2_msgs::TFMessage());
 		ROSMessages::geometry_msgs::TransformStamped TransformImage;
 		TransformImage.header.seq = 0;
@@ -359,9 +353,6 @@ void UVisionComponent::TickComponent(float DeltaTime,
 	CamInfo->roi.do_rectify = false;
 
 	CameraInfoPublisher->Publish(CamInfo);
-
-	// Clean up
-	delete[] TargetDepthBuf;
 }
 
 void UVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

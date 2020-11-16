@@ -54,7 +54,7 @@ public:
   };
 
 private:
-  std::vector<uint8> ReadBuffer, WriteBuffer;
+  std::vector<uint8> Buffer;
   bool IsDataReadable;
   std::mutex LockBuffer, LockRead;
   std::condition_variable CVWait;
@@ -67,9 +67,9 @@ public:
   // Size of the complete packet
   const uint32 Size;
   // Pointers to the beginning of the images and map for writing and a pointer to the beginning of a completed packet for reading
-  uint8 *Color, *Read;
+  uint8 *Color;
   // Pointer to the packet headers
-  PacketHeader *HeaderWrite, *HeaderRead;
+  PacketHeader *Header;
 
   // Initializes the buffer, widht and height are not changeable afterwards
   PacketBuffer(const uint32 Width, const uint32 Height, const float FieldOfView);
