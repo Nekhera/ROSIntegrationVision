@@ -92,4 +92,8 @@ private:
   void StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const;
   void ProcessColor();
 
+public:
+  UFUNCTION(BlueprintCallable, Category = "Publisher")
+  void PublishImages();
+
 };
