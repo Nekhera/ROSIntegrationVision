@@ -41,11 +41,7 @@ public:
 UVisionComponent::UVisionComponent() :
 Width(960),
 Height(540),
-Framerate(1),
-UseEngineFramerate(false),
-ServerPort(10000),
-FrameTime(1.0f / Framerate),
-TimePassed(0)
+ServerPort(10000)
 {
     Priv = new PrivateData();
     FieldOfView = 90.0;
@@ -78,13 +74,6 @@ UVisionComponent::~UVisionComponent()
     delete Priv;
 }
 
-void UVisionComponent::SetFramerate(const float _Framerate)
-{
-    Framerate = _Framerate;
-    FrameTime = 1.0f / _Framerate;
-    TimePassed = 0;
-}
-
 void UVisionComponent::Pause(const bool _Pause)
 {
     Paused = _Pause;
@@ -102,7 +91,7 @@ void UVisionComponent::InitializeComponent()
 
 void UVisionComponent::BeginPlay()
 {
-  Super::BeginPlay();
+	Super::BeginPlay();
     // Initializing buffers for reading images from the GPU
 	ImageColor.AddUninitialized(Width * Height);
 
@@ -124,10 +113,13 @@ void UVisionComponent::BeginPlay()
 
 	// Starting threads to process image data
 	Priv->ThreadColor = std::thread(&UVisionComponent::ProcessColor, this);
+}
 
+void UVisionComponent::InitializeTopics()
+{
 	// Establish ROS communication
 	UROSIntegrationGameInstance* rosinst = Cast<UROSIntegrationGameInstance>(GetOwner()->GetGameInstance());
-	
+
 	if (rosinst && rosinst->bConnectToROS)
 	{
 		TFPublisher->Init(rosinst->ROSIntegrationCore, TFTopicName, TEXT("tf2_msgs/TFMessage"));
@@ -139,12 +131,10 @@ void UVisionComponent::BeginPlay()
 		ImagePublisher->Advertise();
 
 	}
-	else 
+	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UnrealROSInstance not existing."));
 	}
-
-	SetFramerate(Framerate); // Update framerate
 }
 
 void UVisionComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *TickFunction)

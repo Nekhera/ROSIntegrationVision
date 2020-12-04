@@ -18,7 +18,9 @@ public:
   UVisionComponent();
   ~UVisionComponent();
   
-  void SetFramerate(const float _FrameRate);
+  UFUNCTION(BlueprintCallable, Category = "ROS")
+  void InitializeTopics();
+  
   void Pause(const bool _Pause = true);
   bool IsPaused() const;
   
@@ -30,10 +32,6 @@ public:
     uint32 Width;
   UPROPERTY(EditAnywhere, Category = "Vision Component")
     uint32 Height;
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    float Framerate;
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    bool UseEngineFramerate; 
   UPROPERTY(EditAnywhere, Category = "Vision Component")
     int32 ServerPort;
     
@@ -68,8 +66,6 @@ protected:
                              enum ELevelTick TickType,
                              FActorComponentTickFunction *TickFunction) override;
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-   
-  float FrameTime, TimePassed;
 
 private:
     
