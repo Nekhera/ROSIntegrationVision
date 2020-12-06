@@ -84,37 +84,6 @@ bool UVisionComponent::IsPaused() const
     return Paused;
 }
 
-void UVisionComponent::InitializeComponent()
-{
-    Super::InitializeComponent();
-}
-
-void UVisionComponent::BeginPlay()
-{
-	Super::BeginPlay();
-    // Initializing buffers for reading images from the GPU
-	ImageColor.AddUninitialized(Width * Height);
-
-	// Reinit renderer
-	Color->TextureTarget->InitAutoFormat(Width, Height);
-
-	AspectRatio = Width / (float)Height;
-
-	// Setting flags for each camera
-	ShowFlagsLit(Color->ShowFlags);
-
-	// Creating double buffer and setting the pointer of the server object
-	Priv->Buffer = TSharedPtr<PacketBuffer>(new PacketBuffer(Width, Height, FieldOfView));
-
-	Running = true;
-	Paused = false;
-
-	Priv->DoColor = false;
-
-	// Starting threads to process image data
-	Priv->ThreadColor = std::thread(&UVisionComponent::ProcessColor, this);
-}
-
 void UVisionComponent::InitializeTopics()
 {
 	// Establish ROS communication
@@ -129,128 +98,10 @@ void UVisionComponent::InitializeTopics()
 
 		ImagePublisher->Init(rosinst->ROSIntegrationCore, ImageTopicName, TEXT("sensor_msgs/Image"));
 		ImagePublisher->Advertise();
-
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UnrealROSInstance not existing."));
-	}
-}
-
-void UVisionComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *TickFunction)
-{
-    Super::TickComponent(DeltaTime, TickType, TickFunction);
-}
-
-void UVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-    Running = false;
-
-    // Stopping processing threads
-	Priv->DoColor = true;
-    Priv->CVColor.notify_one();
-
-    Priv->ThreadColor.join();
-}
-
-void UVisionComponent::ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const
-{
-	ShowFlags = FEngineShowFlags(EShowFlagInitMode::ESFIM_All0);
-	ShowFlags.SetRendering(true);
-	ShowFlags.SetStaticMeshes(true);
-	ShowFlags.SetLandscape(true);
-	ShowFlags.SetInstancedFoliage(true);
-	ShowFlags.SetInstancedGrass(true);
-	ShowFlags.SetInstancedStaticMeshes(true);
-}
-
-void UVisionComponent::ShowFlagsLit(FEngineShowFlags &ShowFlags) const
-{
-	ShowFlagsBasicSetting(ShowFlags);
-	ShowFlags = FEngineShowFlags(EShowFlagInitMode::ESFIM_Game);
-	ApplyViewMode(VMI_Lit, true, ShowFlags);
-	ShowFlags.SetMaterials(true);
-	ShowFlags.SetLighting(true);
-	ShowFlags.SetPostProcessing(true);
-	// ToneMapper needs to be enabled, otherwise the screen will be very dark
-	ShowFlags.SetTonemapper(true);
-	// TemporalAA needs to be disabled, otherwise the previous frame might contaminate current frame.
-	// Check: https://answers.unrealengine.com/questions/436060/low-quality-screenshot-after-setting-the-actor-pos.html for detail
-	ShowFlags.SetTemporalAA(false);
-	ShowFlags.SetAntiAliasing(true);
-	ShowFlags.SetEyeAdaptation(false); // Eye adaption is a slow temporal procedure, not useful for image capture
-}
-
-void UVisionComponent::ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const
-{
-	ShowFlagsLit(ShowFlags);
-	ApplyViewMode(VMI_Lit, true, ShowFlags);
-
-	// From MeshPaintEdMode.cpp:2942
-	ShowFlags.SetMaterials(false);
-	ShowFlags.SetLighting(false);
-	ShowFlags.SetBSPTriangles(true);
-	ShowFlags.SetVertexColors(true);
-	ShowFlags.SetPostProcessing(false);
-	ShowFlags.SetHMDDistortion(false);
-	ShowFlags.SetTonemapper(false); // This won't take effect here
-
-	GVertexColorViewMode = EVertexColorViewMode::Color;
-}
-
-void UVisionComponent::ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
-{
-	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-	RenderTargetResource->ReadFloat16Pixels(ImageData);
-}
-
-void UVisionComponent::ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
-{
-	TArray<FFloat16Color> RawImageData;
-	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-	RenderTargetResource->ReadFloat16Pixels(RawImageData);
-
-	static IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-	static TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
-	ImageWrapper->SetRaw(RawImageData.GetData(), RawImageData.GetAllocatedSize(), Width, Height, ERGBFormat::BGRA, 8);
-}
-
-void UVisionComponent::ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const
-{
-	const FFloat16Color *itI = ImageData.GetData();
-	uint8_t *itO = Bytes;
-
-	// Converts Float colors to bytes
-	for (size_t i = 0; i < ImageData.Num(); ++i, ++itI, ++itO)
-	{
-		*itO = (uint8_t)std::round((float)itI->B * 255.f);
-		*++itO = (uint8_t)std::round((float)itI->G * 255.f);
-		*++itO = (uint8_t)std::round((float)itI->R * 255.f);
-	}
-	return;
-}
-
-void UVisionComponent::StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const
-{
-	std::ofstream File(Name, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
-	File.write(reinterpret_cast<const char *>(ImageData), Size);
-	File.close();
-	return;
-}
-
-void UVisionComponent::ProcessColor()
-{
-	while (true)
-	{
-		std::unique_lock<std::mutex> WaitLock(Priv->WaitColor);
-		Priv->CVColor.wait(WaitLock, [this] {return Priv->DoColor; });
-		Priv->DoColor = false;
-		if (!this->Running) break;
-		ToColorImage(ImageColor, Priv->Buffer->Color);
-
-		// Complete Buffer
-		Priv->Buffer->DoneWriting();
 	}
 }
 
@@ -452,4 +303,152 @@ void UVisionComponent::PublishImages()
 	CamInfo->roi.do_rectify = false;
 
 	CameraInfoPublisher->Publish(CamInfo);
+}
+
+void UVisionComponent::InitializeComponent()
+{
+    Super::InitializeComponent();
+}
+
+void UVisionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+    // Initializing buffers for reading images from the GPU
+	ImageColor.AddUninitialized(Width * Height);
+
+	// Reinit renderer
+	Color->TextureTarget->InitAutoFormat(Width, Height);
+
+	AspectRatio = Width / (float)Height;
+
+	// Setting flags for each camera
+	ShowFlagsLit(Color->ShowFlags);
+
+	// Creating double buffer and setting the pointer of the server object
+	Priv->Buffer = TSharedPtr<PacketBuffer>(new PacketBuffer(Width, Height, FieldOfView));
+
+	Running = true;
+	Paused = false;
+
+	Priv->DoColor = false;
+
+	// Starting threads to process image data
+	Priv->ThreadColor = std::thread(&UVisionComponent::ProcessColor, this);
+}
+
+void UVisionComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *TickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, TickFunction);
+}
+
+void UVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+    Running = false;
+
+    // Stopping processing threads
+	Priv->DoColor = true;
+    Priv->CVColor.notify_one();
+
+    Priv->ThreadColor.join();
+}
+
+void UVisionComponent::ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const
+{
+	ShowFlags = FEngineShowFlags(EShowFlagInitMode::ESFIM_All0);
+	ShowFlags.SetRendering(true);
+	ShowFlags.SetStaticMeshes(true);
+	ShowFlags.SetLandscape(true);
+	ShowFlags.SetInstancedFoliage(true);
+	ShowFlags.SetInstancedGrass(true);
+	ShowFlags.SetInstancedStaticMeshes(true);
+}
+
+void UVisionComponent::ShowFlagsLit(FEngineShowFlags &ShowFlags) const
+{
+	ShowFlagsBasicSetting(ShowFlags);
+	ShowFlags = FEngineShowFlags(EShowFlagInitMode::ESFIM_Game);
+	ApplyViewMode(VMI_Lit, true, ShowFlags);
+	ShowFlags.SetMaterials(true);
+	ShowFlags.SetLighting(true);
+	ShowFlags.SetPostProcessing(true);
+	// ToneMapper needs to be enabled, otherwise the screen will be very dark
+	ShowFlags.SetTonemapper(true);
+	// TemporalAA needs to be disabled, otherwise the previous frame might contaminate current frame.
+	// Check: https://answers.unrealengine.com/questions/436060/low-quality-screenshot-after-setting-the-actor-pos.html for detail
+	ShowFlags.SetTemporalAA(false);
+	ShowFlags.SetAntiAliasing(true);
+	ShowFlags.SetEyeAdaptation(false); // Eye adaption is a slow temporal procedure, not useful for image capture
+}
+
+void UVisionComponent::ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const
+{
+	ShowFlagsLit(ShowFlags);
+	ApplyViewMode(VMI_Lit, true, ShowFlags);
+
+	// From MeshPaintEdMode.cpp:2942
+	ShowFlags.SetMaterials(false);
+	ShowFlags.SetLighting(false);
+	ShowFlags.SetBSPTriangles(true);
+	ShowFlags.SetVertexColors(true);
+	ShowFlags.SetPostProcessing(false);
+	ShowFlags.SetHMDDistortion(false);
+	ShowFlags.SetTonemapper(false); // This won't take effect here
+
+	GVertexColorViewMode = EVertexColorViewMode::Color;
+}
+
+void UVisionComponent::ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
+{
+	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+	RenderTargetResource->ReadFloat16Pixels(ImageData);
+}
+
+void UVisionComponent::ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
+{
+	TArray<FFloat16Color> RawImageData;
+	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
+	RenderTargetResource->ReadFloat16Pixels(RawImageData);
+
+	static IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+	static TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+	ImageWrapper->SetRaw(RawImageData.GetData(), RawImageData.GetAllocatedSize(), Width, Height, ERGBFormat::BGRA, 8);
+}
+
+void UVisionComponent::ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const
+{
+	const FFloat16Color *itI = ImageData.GetData();
+	uint8_t *itO = Bytes;
+
+	// Converts Float colors to bytes
+	for (size_t i = 0; i < ImageData.Num(); ++i, ++itI, ++itO)
+	{
+		*itO = (uint8_t)std::round((float)itI->B * 255.f);
+		*++itO = (uint8_t)std::round((float)itI->G * 255.f);
+		*++itO = (uint8_t)std::round((float)itI->R * 255.f);
+	}
+	return;
+}
+
+void UVisionComponent::StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const
+{
+	std::ofstream File(Name, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
+	File.write(reinterpret_cast<const char *>(ImageData), Size);
+	File.close();
+	return;
+}
+
+void UVisionComponent::ProcessColor()
+{
+	while (true)
+	{
+		std::unique_lock<std::mutex> WaitLock(Priv->WaitColor);
+		Priv->CVColor.wait(WaitLock, [this] {return Priv->DoColor; });
+		Priv->DoColor = false;
+		if (!this->Running) break;
+		ToColorImage(ImageColor, Priv->Buffer->Color);
+
+		// Complete Buffer
+		Priv->Buffer->DoneWriting();
+	}
 }

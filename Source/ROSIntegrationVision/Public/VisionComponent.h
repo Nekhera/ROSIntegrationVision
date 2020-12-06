@@ -12,84 +12,82 @@
 UCLASS()
 class ROSINTEGRATIONVISION_API UVisionComponent : public UCameraComponent
 {
-  GENERATED_BODY()
-  
-public:
-  UVisionComponent();
-  ~UVisionComponent();
-  
-  UFUNCTION(BlueprintCallable, Category = "ROS")
-  void InitializeTopics();
-  
-  void Pause(const bool _Pause = true);
-  bool IsPaused() const;
-  
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    FString ParentLink; // Defines the link that binds to the image frame.
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    bool DisableTFPublishing; 
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    uint32 Width;
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    uint32 Height;
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    int32 ServerPort;
-    
-  // The cameras for color, depth and objects;
-  UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = "Vision Component")
-    USceneCaptureComponent2D * Color;
-  
-  UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
-    FString ImageFrame = TEXT("/unreal_ros/image_frame");
-  UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
-    FString ImageOpticalFrame = TEXT("/unreal_ros/image_optical_frame");
+    GENERATED_BODY()
 
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    FString CameraInfoTopicName = TEXT("/unreal_ros/camera_info");
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    FString ImageTopicName = TEXT("/unreal_ros/image_color");
-  UPROPERTY(EditAnywhere, Category = "Vision Component")
-    FString TFTopicName = TEXT("/tf");
-    
-  UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-    UTopic * CameraInfoPublisher;
-  UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-    UTopic * ImagePublisher;
-  UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-    UTopic * TFPublisher;
+public:
+
+    UVisionComponent();
+    ~UVisionComponent();
+    void Pause(const bool _Pause = true);
+    bool IsPaused() const;
+
+    UFUNCTION(BlueprintCallable, Category = "ROS")
+        void InitializeTopics();
+    UFUNCTION(BlueprintCallable, Category = "ROS")
+        void PublishImages();
+
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        FString ParentLink; // Defines the link that binds to the image frame.
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        bool DisableTFPublishing;
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        uint32 Width;
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        uint32 Height;
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        int32 ServerPort;
+
+    // The cameras for color, depth and objects;
+    UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = "Vision Component")
+        USceneCaptureComponent2D* Color;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
+        FString ImageFrame = TEXT("/unreal_ros/image_frame");
+    UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
+        FString ImageOpticalFrame = TEXT("/unreal_ros/image_optical_frame");
+
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        FString CameraInfoTopicName = TEXT("/unreal_ros/camera_info");
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        FString ImageTopicName = TEXT("/unreal_ros/image_color");
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
+        FString TFTopicName = TEXT("/tf");
+
+    UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
+        UTopic* CameraInfoPublisher;
+    UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
+        UTopic* ImagePublisher;
+    UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
+        UTopic* TFPublisher;
 
 protected:
   
-  virtual void InitializeComponent() override;
-  virtual void BeginPlay() override;
-  virtual void TickComponent(float DeltaTime, 
-                             enum ELevelTick TickType,
-                             FActorComponentTickFunction *TickFunction) override;
-  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void InitializeComponent() override;
+    virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, 
+                               enum ELevelTick TickType,
+                               FActorComponentTickFunction *TickFunction) override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     
-  // Private data container
-  class PrivateData;
-  PrivateData *Priv;
+    // Private data container
+    class PrivateData;
+    PrivateData *Priv;
 
-  UMaterialInstanceDynamic *MaterialDepthInstance;
+    UMaterialInstanceDynamic *MaterialDepthInstance;
   
-  TArray<FFloat16Color> ImageColor;
-  TArray<uint8> DataColor;
-  bool Running, Paused;
+    TArray<FFloat16Color> ImageColor;
+    TArray<uint8> DataColor;
+    bool Running, Paused;
   
-  void ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const;
-  void ShowFlagsLit(FEngineShowFlags &ShowFlags) const;
-  void ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const;
-  void ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
-  void ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
-  void ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const;
-  void StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const;
-  void ProcessColor();
-
-public:
-  UFUNCTION(BlueprintCallable, Category = "Publisher")
-  void PublishImages();
+    void ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const;
+    void ShowFlagsLit(FEngineShowFlags &ShowFlags) const;
+    void ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const;
+    void ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
+    void ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
+    void ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const;
+    void StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const;
+    void ProcessColor();
 
 };
