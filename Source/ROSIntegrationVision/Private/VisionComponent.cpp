@@ -46,7 +46,6 @@ ServerPort(10000)
     Priv = new PrivateData();
     FieldOfView = 90.0;
     PrimaryComponentTick.bCanEverTick = true;
-    PrimaryComponentTick.bStartWithTickEnabled = true;
 
     auto owner = GetOwner();
     if (owner)
@@ -87,7 +86,8 @@ bool UVisionComponent::IsPaused() const
 void UVisionComponent::InitializeTopics()
 {
 	// Establish ROS communication
-	UROSIntegrationGameInstance* rosinst = Cast<UROSIntegrationGameInstance>(GetOwner()->GetGameInstance());
+	UROSIntegrationGameInstance* rosinst = Cast<UROSIntegrationGameInstance>
+		(GetOwner()->GetGameInstance());
 
 	if (rosinst && rosinst->bConnectToROS)
 	{
