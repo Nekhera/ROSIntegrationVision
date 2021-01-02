@@ -62,10 +62,6 @@ ServerPort(10000)
 	{
         UE_LOG(LogTemp, Warning, TEXT("No owner!"));
     }
-
-    CameraInfoPublisher = NewObject<UTopic>(UTopic::StaticClass());
-    ImagePublisher = NewObject<UTopic>(UTopic::StaticClass());
-    TFPublisher = NewObject<UTopic>(UTopic::StaticClass());
 }
 
 UVisionComponent::~UVisionComponent()
@@ -91,13 +87,17 @@ void UVisionComponent::InitializeTopics()
 
 	if (rosinst && rosinst->bConnectToROS)
 	{
-		TFPublisher->Init(rosinst->ROSIntegrationCore, TFTopicName, TEXT("tf2_msgs/TFMessage"));
+		CameraInfoPublisher = NewObject<UTopic>(UTopic::StaticClass());
+		ImagePublisher = NewObject<UTopic>(UTopic::StaticClass());
+		TFPublisher = NewObject<UTopic>(UTopic::StaticClass());
 
 		CameraInfoPublisher->Init(rosinst->ROSIntegrationCore, CameraInfoTopicName, TEXT("sensor_msgs/CameraInfo"));
 		CameraInfoPublisher->Advertise();
 
 		ImagePublisher->Init(rosinst->ROSIntegrationCore, ImageTopicName, TEXT("sensor_msgs/Image"));
 		ImagePublisher->Advertise();
+
+		TFPublisher->Init(rosinst->ROSIntegrationCore, TFTopicName, TEXT("tf2_msgs/TFMessage"));
 	}
 	else
 	{
