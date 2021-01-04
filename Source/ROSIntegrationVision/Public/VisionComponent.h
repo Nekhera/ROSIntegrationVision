@@ -29,6 +29,8 @@ public:
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         FString ParentLink; // Defines the link that binds to the image frame.
     UPROPERTY(EditAnywhere, Category = "Vision Component")
+        float TranslateX;
+    UPROPERTY(EditAnywhere, Category = "Vision Component")
         bool DisableTFPublishing;
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         uint32 Width;
@@ -42,9 +44,9 @@ public:
         USceneCaptureComponent2D* Color;
 
     UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
-        FString ImageFrame = TEXT("/unreal_ros/image_frame");
+        FString ImageFrame = TEXT("camera_frame");
     UPROPERTY(BlueprintReadWrite, Category = "Vision Component")
-        FString ImageOpticalFrame = TEXT("/unreal_ros/image_optical_frame");
+        FString ImageOpticalFrame = TEXT("camera_frame_optical");
 
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         FString CameraInfoTopicName = TEXT("/unreal_ros/camera_info");

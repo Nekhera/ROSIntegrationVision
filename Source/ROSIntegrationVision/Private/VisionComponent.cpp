@@ -39,8 +39,8 @@ public:
 };
 
 UVisionComponent::UVisionComponent() :
-Width(960),
-Height(540),
+Width(480),
+Height(270),
 ServerPort(10000)
 {
     Priv = new PrivateData();
@@ -250,7 +250,7 @@ void UVisionComponent::PublishImages()
 	TSharedPtr<ROSMessages::sensor_msgs::CameraInfo> CamInfo(new ROSMessages::sensor_msgs::CameraInfo());
 	CamInfo->header.seq = 0;
 	CamInfo->header.time = time;
-	//CamInfo->header.frame_id =
+	CamInfo->header.frame_id = ImageOpticalFrame;
 	CamInfo->height = Height;
 	CamInfo->width = Width;
 	CamInfo->distortion_model = TEXT("plumb_bob");
@@ -283,7 +283,7 @@ void UVisionComponent::PublishImages()
 	CamInfo->P[0] = P0;
 	CamInfo->P[1] = 0;
 	CamInfo->P[2] = P2;
-	CamInfo->P[3] = 0;
+	CamInfo->P[3] = P0 * TranslateX;
 	CamInfo->P[4] = 0;
 	CamInfo->P[5] = P5;
 	CamInfo->P[6] = P6;
