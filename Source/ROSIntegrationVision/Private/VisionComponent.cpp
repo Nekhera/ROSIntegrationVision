@@ -98,6 +98,7 @@ void UVisionComponent::InitializeTopics()
 		ImagePublisher->Advertise();
 
 		TFPublisher->Init(rosinst->ROSIntegrationCore, TFTopicName, TEXT("tf2_msgs/TFMessage"));
+		TFPublisher->Advertise();
 	}
 	else
 	{
@@ -105,80 +106,74 @@ void UVisionComponent::InitializeTopics()
 	}
 }
 
-void UVisionComponent::PublishImages()
-{
+void UVisionComponent::PublishImages() {
 	// Check if paused
-	if (Paused)
-	{
+	if (Paused) {
 		return;
 	}
 
-	auto owner = GetOwner();
-	owner->UpdateComponentTransforms();
-
-	FDateTime Now = FDateTime::UtcNow();
-	Priv->Buffer->HeaderWrite->TimestampCapture = Now.ToUnixTimestamp() * 1000000000 + Now.GetMillisecond() * 1000000;
-
-	FVector Translation = GetComponentLocation();
-	FQuat Rotation = GetComponentQuat();
-	// Convert to meters and ROS coordinate system
-	Priv->Buffer->HeaderWrite->Translation.X = Translation.X / 100.0f;
-	Priv->Buffer->HeaderWrite->Translation.Y = -Translation.Y / 100.0f;
-	Priv->Buffer->HeaderWrite->Translation.Z = Translation.Z / 100.0f;
-	Priv->Buffer->HeaderWrite->Rotation.X = -Rotation.X;
-	Priv->Buffer->HeaderWrite->Rotation.Y = Rotation.Y;
-	Priv->Buffer->HeaderWrite->Rotation.Z = -Rotation.Z;
-	Priv->Buffer->HeaderWrite->Rotation.W = Rotation.W;
-
-	// Read color image and notify processing thread
-	Priv->WaitColor.lock();
-	ReadImage(Color->TextureTarget, ImageColor);
-	Priv->WaitColor.unlock();
-	Priv->DoColor = true;
-	Priv->CVColor.notify_one();
-
-	Priv->Buffer->StartReading();
-	uint32_t xSize = Priv->Buffer->HeaderRead->Size;
-	uint32_t xSizeHeader = Priv->Buffer->HeaderRead->SizeHeader; // Size of the header
-	uint32_t xWidth = Priv->Buffer->HeaderRead->Width; // Width of the images
-	uint32_t xHeight = Priv->Buffer->HeaderRead->Height; // Height of the images
-
-	// Get the data offsets for the different types of images that are in the buffer
-	const uint32_t& OffsetColor = Priv->Buffer->OffsetColor;
-	const uint32_t ColorImageSize = Width * Height * 3;
-	UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetColor);
-
 	FROSTime time = FROSTime::Now();
 
-	TSharedPtr<ROSMessages::sensor_msgs::Image> ImageMessage(new ROSMessages::sensor_msgs::Image());
+	if (ImagePublisher && ImagePublisher->IsAdvertising()) {
+		auto owner = GetOwner();
+		owner->UpdateComponentTransforms();
 
-	ImageMessage->header.seq = 0;
-	ImageMessage->header.time = time;
-	ImageMessage->header.frame_id = ImageOpticalFrame;
-	ImageMessage->height = Height;
-	ImageMessage->width = Width;
-	ImageMessage->encoding = TEXT("bgr8");
-	ImageMessage->step = Width * 3;
-	ImageMessage->data = &Priv->Buffer->Read[OffsetColor];
-	ImagePublisher->Publish(ImageMessage);
+		FDateTime Now = FDateTime::UtcNow();
+		Priv->Buffer->HeaderWrite->TimestampCapture = Now.ToUnixTimestamp() * 1000000000 + Now.GetMillisecond() * 1000000;
 
-	Priv->Buffer->DoneReading();
+		FVector Translation = GetComponentLocation();
+		FQuat Rotation = GetComponentQuat();
+		// Convert to meters and ROS coordinate system
+		Priv->Buffer->HeaderWrite->Translation.X = Translation.X / 100.0f;
+		Priv->Buffer->HeaderWrite->Translation.Y = -Translation.Y / 100.0f;
+		Priv->Buffer->HeaderWrite->Translation.Z = Translation.Z / 100.0f;
+		Priv->Buffer->HeaderWrite->Rotation.X = -Rotation.X;
+		Priv->Buffer->HeaderWrite->Rotation.Y = Rotation.Y;
+		Priv->Buffer->HeaderWrite->Rotation.Z = -Rotation.Z;
+		Priv->Buffer->HeaderWrite->Rotation.W = Rotation.W;
 
-	double x = Priv->Buffer->HeaderRead->Translation.X;
-	double y = Priv->Buffer->HeaderRead->Translation.Y;
-	double z = Priv->Buffer->HeaderRead->Translation.Z;
-	double rx = Priv->Buffer->HeaderRead->Rotation.X;
-	double ry = Priv->Buffer->HeaderRead->Rotation.Y;
-	double rz = Priv->Buffer->HeaderRead->Rotation.Z;
-	double rw = Priv->Buffer->HeaderRead->Rotation.W;
+		// Read color image and notify processing thread
+		Priv->WaitColor.lock();
+		ReadImage(Color->TextureTarget, ImageColor);
+		Priv->WaitColor.unlock();
+		Priv->DoColor = true;
+		Priv->CVColor.notify_one();
 
-	if (!DisableTFPublishing)
-	{
-		// Start advertising TF only if it has yet to advertise.
-		if (!TFPublisher->IsAdvertising())
-		{
-			TFPublisher->Advertise();
-		}
+		Priv->Buffer->StartReading();
+		uint32_t xSize = Priv->Buffer->HeaderRead->Size;
+		uint32_t xSizeHeader = Priv->Buffer->HeaderRead->SizeHeader; // Size of the header
+		uint32_t xWidth = Priv->Buffer->HeaderRead->Width; // Width of the images
+		uint32_t xHeight = Priv->Buffer->HeaderRead->Height; // Height of the images
+
+		// Get the data offsets for the different types of images that are in the buffer
+		const uint32_t& OffsetColor = Priv->Buffer->OffsetColor;
+		const uint32_t ColorImageSize = Width * Height * 3;
+		UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetColor);
+
+		TSharedPtr<ROSMessages::sensor_msgs::Image> ImageMessage(new ROSMessages::sensor_msgs::Image());
+
+		ImageMessage->header.seq = 0;
+		ImageMessage->header.time = time;
+		ImageMessage->header.frame_id = ImageOpticalFrame;
+		ImageMessage->height = Height;
+		ImageMessage->width = Width;
+		ImageMessage->encoding = TEXT("bgr8");
+		ImageMessage->step = Width * 3;
+		ImageMessage->data = &Priv->Buffer->Read[OffsetColor];
+		ImagePublisher->Publish(ImageMessage);
+
+		Priv->Buffer->DoneReading();
+	}
+
+	if (TFPublisher && TFPublisher->IsAdvertising()) {
+		double x = Priv->Buffer->HeaderRead->Translation.X;
+		double y = Priv->Buffer->HeaderRead->Translation.Y;
+		double z = Priv->Buffer->HeaderRead->Translation.Z;
+		double rx = Priv->Buffer->HeaderRead->Rotation.X;
+		double ry = Priv->Buffer->HeaderRead->Rotation.Y;
+		double rz = Priv->Buffer->HeaderRead->Rotation.Z;
+		double rw = Priv->Buffer->HeaderRead->Rotation.W;
+
 
 		TSharedPtr<ROSMessages::tf2_msgs::TFMessage> TFImageFrame(new ROSMessages::tf2_msgs::TFMessage());
 		ROSMessages::geometry_msgs::TransformStamped TransformImage;
@@ -220,89 +215,85 @@ void UVisionComponent::PublishImages()
 
 		TFPublisher->Publish(TFOpticalFrame);
 	}
-	// Stop advertising if TF has been disabled and is already advertising.
-	else if (TFPublisher->IsAdvertising())
-	{
-		TFPublisher->Unadvertise();
-	}
 
 	// Construct and publish CameraInfo
+	if (CameraInfoPublisher && CameraInfoPublisher->IsAdvertising()) {
+		const float FOVX = Height > Width ? FieldOfView * Width / Height : FieldOfView;
+		const float FOVY = Width > Height ? FieldOfView * Height / Width : FieldOfView;
+		double halfFOVX = FOVX * PI / 360.0; // was M_PI on gcc
+		double halfFOVY = FOVY * PI / 360.0; // was M_PI on gcc
+		const double cX = Width / 2.0;
+		const double cY = Height / 2.0;
 
-	const float FOVX = Height > Width ? FieldOfView * Width / Height : FieldOfView;
-	const float FOVY = Width > Height ? FieldOfView * Height / Width : FieldOfView;
-	double halfFOVX = FOVX * PI / 360.0; // was M_PI on gcc
-	double halfFOVY = FOVY * PI / 360.0; // was M_PI on gcc
-	const double cX = Width / 2.0;
-	const double cY = Height / 2.0;
+		const double K0 = cX / std::tan(halfFOVX);
+		const double K2 = cX;
+		const double K4 = K0;
+		const double K5 = cY;
+		const double K8 = 1;
 
-	const double K0 = cX / std::tan(halfFOVX);
-	const double K2 = cX;
-	const double K4 = K0;
-	const double K5 = cY;
-	const double K8 = 1;
+		const double P0 = K0;
+		const double P2 = K2;
+		const double P5 = K4;
+		const double P6 = K5;
+		const double P10 = 1;
 
-	const double P0 = K0;
-	const double P2 = K2;
-	const double P5 = K4;
-	const double P6 = K5;
-	const double P10 = 1;
+		TSharedPtr<ROSMessages::sensor_msgs::CameraInfo> CamInfo(new ROSMessages::sensor_msgs::CameraInfo());
+		CamInfo->header.seq = 0;
+		CamInfo->header.time = time;
+		CamInfo->header.frame_id = ImageOpticalFrame;
+		CamInfo->height = Height;
+		CamInfo->width = Width;
+		CamInfo->distortion_model = TEXT("plumb_bob");
+		CamInfo->D[0] = 0;
+		CamInfo->D[1] = 0;
+		CamInfo->D[2] = 0;
+		CamInfo->D[3] = 0;
+		CamInfo->D[4] = 0;
 
-	TSharedPtr<ROSMessages::sensor_msgs::CameraInfo> CamInfo(new ROSMessages::sensor_msgs::CameraInfo());
-	CamInfo->header.seq = 0;
-	CamInfo->header.time = time;
-	CamInfo->header.frame_id = ImageOpticalFrame;
-	CamInfo->height = Height;
-	CamInfo->width = Width;
-	CamInfo->distortion_model = TEXT("plumb_bob");
-	CamInfo->D[0] = 0;
-	CamInfo->D[1] = 0;
-	CamInfo->D[2] = 0;
-	CamInfo->D[3] = 0;
-	CamInfo->D[4] = 0;
+		CamInfo->K[0] = K0;
+		CamInfo->K[1] = 0;
+		CamInfo->K[2] = K2;
+		CamInfo->K[3] = 0;
+		CamInfo->K[4] = K4;
+		CamInfo->K[5] = K5;
+		CamInfo->K[6] = 0;
+		CamInfo->K[7] = 0;
+		CamInfo->K[8] = K8;
 
-	CamInfo->K[0] = K0;
-	CamInfo->K[1] = 0;
-	CamInfo->K[2] = K2;
-	CamInfo->K[3] = 0;
-	CamInfo->K[4] = K4;
-	CamInfo->K[5] = K5;
-	CamInfo->K[6] = 0;
-	CamInfo->K[7] = 0;
-	CamInfo->K[8] = K8;
+		CamInfo->R[0] = 1;
+		CamInfo->R[1] = 0;
+		CamInfo->R[2] = 0;
+		CamInfo->R[3] = 0;
+		CamInfo->R[4] = 1;
+		CamInfo->R[5] = 0;
+		CamInfo->R[6] = 0;
+		CamInfo->R[7] = 0;
+		CamInfo->R[8] = 1;
 
-	CamInfo->R[0] = 1;
-	CamInfo->R[1] = 0;
-	CamInfo->R[2] = 0;
-	CamInfo->R[3] = 0;
-	CamInfo->R[4] = 1;
-	CamInfo->R[5] = 0;
-	CamInfo->R[6] = 0;
-	CamInfo->R[7] = 0;
-	CamInfo->R[8] = 1;
+		CamInfo->P[0] = P0;
+		CamInfo->P[1] = 0;
+		CamInfo->P[2] = P2;
+		CamInfo->P[3] = P0 * TranslateX;
+		CamInfo->P[4] = 0;
+		CamInfo->P[5] = P5;
+		CamInfo->P[6] = P6;
+		CamInfo->P[7] = 0;
+		CamInfo->P[8] = 0;
+		CamInfo->P[9] = 0;
+		CamInfo->P[10] = P10;
+		CamInfo->P[11] = 0;
 
-	CamInfo->P[0] = P0;
-	CamInfo->P[1] = 0;
-	CamInfo->P[2] = P2;
-	CamInfo->P[3] = P0 * TranslateX;
-	CamInfo->P[4] = 0;
-	CamInfo->P[5] = P5;
-	CamInfo->P[6] = P6;
-	CamInfo->P[7] = 0;
-	CamInfo->P[8] = 0;
-	CamInfo->P[9] = 0;
-	CamInfo->P[10] = P10;
-	CamInfo->P[11] = 0;
+		CamInfo->binning_x = 0;
+		CamInfo->binning_y = 0;
 
-	CamInfo->binning_x = 0;
-	CamInfo->binning_y = 0;
+		CamInfo->roi.x_offset = 0;
+		CamInfo->roi.y_offset = 0;
+		CamInfo->roi.height = 0;
+		CamInfo->roi.width = 0;
+		CamInfo->roi.do_rectify = false;
 
-	CamInfo->roi.x_offset = 0;
-	CamInfo->roi.y_offset = 0;
-	CamInfo->roi.height = 0;
-	CamInfo->roi.width = 0;
-	CamInfo->roi.do_rectify = false;
-
-	CameraInfoPublisher->Publish(CamInfo);
+		CameraInfoPublisher->Publish(CamInfo);
+	}
 }
 
 void UVisionComponent::InitializeComponent()

@@ -31,8 +31,6 @@ public:
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         float TranslateX;
     UPROPERTY(EditAnywhere, Category = "Vision Component")
-        bool DisableTFPublishing;
-    UPROPERTY(EditAnywhere, Category = "Vision Component")
         uint32 Width;
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         uint32 Height;
