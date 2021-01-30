@@ -1,4 +1,5 @@
 // Author Tim Fronsee <tfronsee21@gmail.com>
+
 #include "VisionComponent.h"
 
 #include <cmath>
@@ -15,7 +16,6 @@
 
 #include "PacketBuffer.h"
 #include "ROSIntegrationGameInstance.h"
-#include "StopTime.h"
 
 #include "EngineUtils.h"
 #include "IImageWrapper.h"
