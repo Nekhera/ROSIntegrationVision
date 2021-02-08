@@ -10,12 +10,11 @@
 #include "VisionComponent.generated.h"
 
 UCLASS()
-class ROSINTEGRATIONVISION_API UVisionComponent : public UCameraComponent
-{
+class ROSINTEGRATIONVISION_API UVisionComponent : public UCameraComponent {
+    
     GENERATED_BODY()
 
 public:
-
     UVisionComponent();
     ~UVisionComponent();
     void Pause(const bool _Pause = true);
@@ -26,8 +25,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ROS")
         void PublishImages();
 
-    UPROPERTY(EditAnywhere, Category = "Vision Component")
-        FString ParentLink; // Defines the link that binds to the image frame.
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         float TranslateX;
     UPROPERTY(EditAnywhere, Category = "Vision Component")
@@ -50,15 +47,11 @@ public:
         FString CameraInfoTopicName = TEXT("/unreal_ros/camera_info");
     UPROPERTY(EditAnywhere, Category = "Vision Component")
         FString ImageTopicName = TEXT("/unreal_ros/image_color");
-    UPROPERTY(EditAnywhere, Category = "Vision Component")
-        FString TFTopicName = TEXT("/tf");
 
     UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
         UTopic* CameraInfoPublisher;
     UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
         UTopic* ImagePublisher;
-    UPROPERTY(Transient, EditAnywhere, Category = "Vision Component")
-        UTopic* TFPublisher;
 
 protected:
   
@@ -74,8 +67,6 @@ private:
     // Private data container
     class PrivateData;
     PrivateData *Priv;
-
-    UMaterialInstanceDynamic *MaterialDepthInstance;
   
     TArray<FFloat16Color> ImageColor;
     TArray<uint8> DataColor;
@@ -83,11 +74,8 @@ private:
   
     void ShowFlagsBasicSetting(FEngineShowFlags &ShowFlags) const;
     void ShowFlagsLit(FEngineShowFlags &ShowFlags) const;
-    void ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const;
     void ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
-    void ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const;
     void ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const;
-    void StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const;
     void ProcessColor();
 
 };

@@ -18,5 +18,5 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision Actor")
-	UVisionComponent* vision; 
+	UVisionComponent* vision;
 };

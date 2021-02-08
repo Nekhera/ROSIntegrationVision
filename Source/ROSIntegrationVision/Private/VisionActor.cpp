@@ -15,7 +15,6 @@ AVisionActor::AVisionActor() : AActor()
     SetRootComponent(RootComponent);
     
     vision = CreateDefaultSubobject<UVisionComponent>(TEXT("Vision"));
-    vision->ParentLink = "/world";
     vision->SetupAttachment(RootComponent);
 }
 

@@ -3,16 +3,10 @@
 #include "VisionComponent.h"
 
 #include <cmath>
-#include <condition_variable>
-#include <fstream>
-#include <mutex>
-#include <thread>
-#include "immintrin.h"
 
 #include "ROSTime.h"
 #include "sensor_msgs/CameraInfo.h"
 #include "sensor_msgs/Image.h"
-#include "tf2_msgs/TFMessage.h"
 
 #include "PacketBuffer.h"
 #include "ROSIntegrationGameInstance.h"
@@ -89,16 +83,12 @@ void UVisionComponent::InitializeTopics()
 	{
 		CameraInfoPublisher = NewObject<UTopic>(UTopic::StaticClass());
 		ImagePublisher = NewObject<UTopic>(UTopic::StaticClass());
-		TFPublisher = NewObject<UTopic>(UTopic::StaticClass());
 
 		CameraInfoPublisher->Init(rosinst->ROSIntegrationCore, CameraInfoTopicName, TEXT("sensor_msgs/CameraInfo"));
 		CameraInfoPublisher->Advertise();
 
 		ImagePublisher->Init(rosinst->ROSIntegrationCore, ImageTopicName, TEXT("sensor_msgs/Image"));
 		ImagePublisher->Advertise();
-
-		TFPublisher->Init(rosinst->ROSIntegrationCore, TFTopicName, TEXT("tf2_msgs/TFMessage"));
-		TFPublisher->Advertise();
 	}
 	else
 	{
@@ -144,10 +134,11 @@ void UVisionComponent::PublishImages() {
 		uint32_t xSizeHeader = Priv->Buffer->HeaderRead->SizeHeader; // Size of the header
 		uint32_t xWidth = Priv->Buffer->HeaderRead->Width; // Width of the images
 		uint32_t xHeight = Priv->Buffer->HeaderRead->Height; // Height of the images
+		uint32_t xBytes = Priv->Buffer->HeaderRead->Bytes;
 
 		// Get the data offsets for the different types of images that are in the buffer
-		const uint32_t& OffsetColor = Priv->Buffer->OffsetColor;
-		const uint32_t ColorImageSize = Width * Height * 3;
+		const uint32_t& OffsetColor = Priv->Buffer->OffsetImage;
+		const uint32_t ColorImageSize = Width * Height * xBytes;
 		UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetColor);
 
 		TSharedPtr<ROSMessages::sensor_msgs::Image> ImageMessage(new ROSMessages::sensor_msgs::Image());
@@ -158,62 +149,11 @@ void UVisionComponent::PublishImages() {
 		ImageMessage->height = Height;
 		ImageMessage->width = Width;
 		ImageMessage->encoding = TEXT("bgr8");
-		ImageMessage->step = Width * 3;
+		ImageMessage->step = Width * xBytes;
 		ImageMessage->data = &Priv->Buffer->Read[OffsetColor];
 		ImagePublisher->Publish(ImageMessage);
 
 		Priv->Buffer->DoneReading();
-	}
-
-	if (TFPublisher && TFPublisher->IsAdvertising()) {
-		double x = Priv->Buffer->HeaderRead->Translation.X;
-		double y = Priv->Buffer->HeaderRead->Translation.Y;
-		double z = Priv->Buffer->HeaderRead->Translation.Z;
-		double rx = Priv->Buffer->HeaderRead->Rotation.X;
-		double ry = Priv->Buffer->HeaderRead->Rotation.Y;
-		double rz = Priv->Buffer->HeaderRead->Rotation.Z;
-		double rw = Priv->Buffer->HeaderRead->Rotation.W;
-
-
-		TSharedPtr<ROSMessages::tf2_msgs::TFMessage> TFImageFrame(new ROSMessages::tf2_msgs::TFMessage());
-		ROSMessages::geometry_msgs::TransformStamped TransformImage;
-		TransformImage.header.seq = 0;
-		TransformImage.header.time = time;
-		TransformImage.header.frame_id = ParentLink;
-		TransformImage.child_frame_id = ImageFrame;
-		TransformImage.transform.translation.x = x;
-		TransformImage.transform.translation.y = y;
-		TransformImage.transform.translation.z = z;
-		TransformImage.transform.rotation.x = rx;
-		TransformImage.transform.rotation.y = ry;
-		TransformImage.transform.rotation.z = rz;
-		TransformImage.transform.rotation.w = rw;
-
-		TFImageFrame->transforms.Add(TransformImage);
-
-		TFPublisher->Publish(TFImageFrame);
-
-		// Publish optical frame
-		FRotator CameraLinkRotator(0.0, -90.0, 90.0);
-		FQuat CameraLinkQuaternion(CameraLinkRotator);
-
-		TSharedPtr<ROSMessages::tf2_msgs::TFMessage> TFOpticalFrame(new ROSMessages::tf2_msgs::TFMessage());
-		ROSMessages::geometry_msgs::TransformStamped TransformOptical;
-		TransformOptical.header.seq = 0;
-		TransformOptical.header.time = time;
-		TransformOptical.header.frame_id = ImageFrame;
-		TransformOptical.child_frame_id = ImageOpticalFrame;
-		TransformOptical.transform.translation.x = 0;
-		TransformOptical.transform.translation.y = 0;
-		TransformOptical.transform.translation.z = 0;
-		TransformOptical.transform.rotation.x = CameraLinkQuaternion.X;
-		TransformOptical.transform.rotation.y = CameraLinkQuaternion.Y;
-		TransformOptical.transform.rotation.z = CameraLinkQuaternion.Z;
-		TransformOptical.transform.rotation.w = CameraLinkQuaternion.W;
-
-		TFOpticalFrame->transforms.Add(TransformOptical);
-
-		TFPublisher->Publish(TFOpticalFrame);
 	}
 
 	// Construct and publish CameraInfo
@@ -316,7 +256,7 @@ void UVisionComponent::BeginPlay()
 	ShowFlagsLit(Color->ShowFlags);
 
 	// Creating double buffer and setting the pointer of the server object
-	Priv->Buffer = TSharedPtr<PacketBuffer>(new PacketBuffer(Width, Height, FieldOfView));
+	Priv->Buffer = TSharedPtr<PacketBuffer>(new PacketBuffer(Width, Height, 3, FieldOfView));
 
 	Running = true;
 	Paused = false;
@@ -372,38 +312,10 @@ void UVisionComponent::ShowFlagsLit(FEngineShowFlags &ShowFlags) const
 	ShowFlags.SetEyeAdaptation(false); // Eye adaption is a slow temporal procedure, not useful for image capture
 }
 
-void UVisionComponent::ShowFlagsVertexColor(FEngineShowFlags &ShowFlags) const
-{
-	ShowFlagsLit(ShowFlags);
-	ApplyViewMode(VMI_Lit, true, ShowFlags);
-
-	// From MeshPaintEdMode.cpp:2942
-	ShowFlags.SetMaterials(false);
-	ShowFlags.SetLighting(false);
-	ShowFlags.SetBSPTriangles(true);
-	ShowFlags.SetVertexColors(true);
-	ShowFlags.SetPostProcessing(false);
-	ShowFlags.SetHMDDistortion(false);
-	ShowFlags.SetTonemapper(false); // This won't take effect here
-
-	GVertexColorViewMode = EVertexColorViewMode::Color;
-}
-
 void UVisionComponent::ReadImage(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
 {
 	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
 	RenderTargetResource->ReadFloat16Pixels(ImageData);
-}
-
-void UVisionComponent::ReadImageCompressed(UTextureRenderTarget2D *RenderTarget, TArray<FFloat16Color> &ImageData) const
-{
-	TArray<FFloat16Color> RawImageData;
-	FTextureRenderTargetResource *RenderTargetResource = RenderTarget->GameThread_GetRenderTargetResource();
-	RenderTargetResource->ReadFloat16Pixels(RawImageData);
-
-	static IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-	static TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
-	ImageWrapper->SetRaw(RawImageData.GetData(), RawImageData.GetAllocatedSize(), Width, Height, ERGBFormat::BGRA, 8);
 }
 
 void UVisionComponent::ToColorImage(const TArray<FFloat16Color> &ImageData, uint8 *Bytes) const
@@ -421,14 +333,6 @@ void UVisionComponent::ToColorImage(const TArray<FFloat16Color> &ImageData, uint
 	return;
 }
 
-void UVisionComponent::StoreImage(const uint8 *ImageData, const uint32 Size, const char *Name) const
-{
-	std::ofstream File(Name, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
-	File.write(reinterpret_cast<const char *>(ImageData), Size);
-	File.close();
-	return;
-}
-
 void UVisionComponent::ProcessColor()
 {
 	while (true)
@@ -437,7 +341,7 @@ void UVisionComponent::ProcessColor()
 		Priv->CVColor.wait(WaitLock, [this] {return Priv->DoColor; });
 		Priv->DoColor = false;
 		if (!this->Running) break;
-		ToColorImage(ImageColor, Priv->Buffer->Color);
+		ToColorImage(ImageColor, Priv->Buffer->Image);
 
 		// Complete Buffer
 		Priv->Buffer->DoneWriting();

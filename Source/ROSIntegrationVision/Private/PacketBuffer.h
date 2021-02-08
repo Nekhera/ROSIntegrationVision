@@ -18,10 +18,7 @@ public:
   /**
    * packet format:
    * - PacketHeader
-   * - Color image data (width * height * 3 Bytes (BGR))
-   * - Depth image data (width * height * 2 Bytes (Float16))
-   * - Object image data (width * height * 3 Bytes (BGR))
-   * - List of map entries
+   * - Image data (width * height * Bytes (Float16 / BGR))
    */
 
   struct Vector
@@ -41,15 +38,18 @@ public:
 
   struct PacketHeader
   {
-    uint32_t Size; // Size of the complete packet
-    uint32_t SizeHeader; // Size of the header
-    uint32_t Width; // Width of the images
-    uint32_t Height; // Height of the images
+    uint32_t Size;             // Size of the complete packet
+    uint32_t SizeHeader;       // Size of the header
+    uint32_t Width;            // Width of the image
+    uint32_t Height;           // Height of the image
+    uint32_t Bytes;            // Number of bytes per pixel
     uint64_t TimestampCapture; // Timestamp from capture
-    uint64_t TimestampSent; // Timestamp from sending
+    uint64_t TimestampSent;    // Timestamp from sending
+
     float FieldOfViewX; // FOV in X direction
     float FieldOfViewY; // FOV in Y dircetion
-    Vector Translation; // Translation of the camera for current frame
+
+    Vector Translation;  // Translation of the camera for current frame
     Quaternion Rotation; // Rotation of the camera for current frame
   };
 
@@ -60,19 +60,19 @@ private:
   std::condition_variable CVWait;
 
 public:
-  // Sizes of the Header, the raw color and depth image data
-  const uint32 SizeHeader, SizeRGB;
-  // Offsets for the images and map entries in the packet buffer
-  const uint32 OffsetColor;
+  // Sizes of the Header, the image data
+  const uint32 SizeHeader, SizeImage;
+  // Offsets for the image in the packet buffer
+  const uint32 OffsetImage;
   // Size of the complete packet
   const uint32 Size;
-  // Pointers to the beginning of the images and map for writing and a pointer to the beginning of a completed packet for reading
-  uint8 *Color, *Read;
+  // Pointers to the beginning of the images for writing and a pointer to the beginning of a completed packet for reading
+  uint8 *Image, *Read;
   // Pointer to the packet headers
   PacketHeader *HeaderWrite, *HeaderRead;
 
   // Initializes the buffer, widht and height are not changeable afterwards
-  PacketBuffer(const uint32 Width, const uint32 Height, const float FieldOfView);
+  PacketBuffer(const uint32 Width, const uint32 Height, const uint32 Bytes, const float FieldOfView);
 
   // Swaps reading and writing buffer and unblocks the reading thread
   void DoneWriting();
