@@ -3,6 +3,7 @@
 #include "VisionComponent.h"
 
 #include <cmath>
+#include <thread>
 
 #include "ROSTime.h"
 #include "sensor_msgs/CameraInfo.h"

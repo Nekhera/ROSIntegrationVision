@@ -3,6 +3,11 @@
 #include "DepthComponent.h"
 
 #include <cmath>
+#include <condition_variable>
+#include <fstream>
+#include <mutex>
+#include <thread>
+#include "immintrin.h"
 
 #include "ROSTime.h"
 #include "sensor_msgs/CameraInfo.h"
