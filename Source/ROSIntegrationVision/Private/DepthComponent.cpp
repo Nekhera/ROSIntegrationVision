@@ -3,11 +3,7 @@
 #include "DepthComponent.h"
 
 #include <cmath>
-#include <condition_variable>
-#include <fstream>
-#include <mutex>
 #include <thread>
-#include "immintrin.h"
 
 #include "ROSTime.h"
 #include "sensor_msgs/CameraInfo.h"
@@ -38,8 +34,8 @@ public:
 };
 
 UDepthComponent::UDepthComponent() :
-Width(480),
-Height(270),
+Width(960),
+Height(540),
 ServerPort(10000)
 {
     Priv = new PrivateData();
@@ -135,14 +131,6 @@ void UDepthComponent::PublishImages() {
 
 		Priv->Buffer->StartReading();
 		const uint32_t& OffsetDepth = Priv->Buffer->OffsetImage;
-
-		// * - Depth image data (width * height * 2 Bytes (Float16))
-		uint8_t* DepthPtr = &Priv->Buffer->Read[OffsetDepth];
-		uint32_t TargetDepthBufSize = Width * Height * 4;
-		uint8_t* TargetDepthBuf = new uint8_t[TargetDepthBufSize]; // Allocate a byte for every pixel * 4 Bytes for a single 32Bit Float
-
-		convertDepth((uint16_t*)DepthPtr, (__m128*)TargetDepthBuf);
-		// convertDepth((uint16_t *)packet.pDepth, (__m128*)&msgDepth->data[0]);
 		UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetDepth);
 
 		TSharedPtr<ROSMessages::sensor_msgs::Image> DepthMessage(new ROSMessages::sensor_msgs::Image());
@@ -154,7 +142,7 @@ void UDepthComponent::PublishImages() {
 		DepthMessage->width = Width;
 		DepthMessage->encoding = TEXT("32FC1");
 		DepthMessage->step = Width * 4;
-		DepthMessage->data = TargetDepthBuf;
+		DepthMessage->data = &Priv->Buffer->Read[OffsetDepth];
 		ImagePublisher->Publish(DepthMessage);
 
 		Priv->Buffer->DoneReading();
@@ -299,7 +287,7 @@ void UDepthComponent::ToDepthImage(const TArray<FFloat16Color>& ImageData, uint8
 	// Just copies the encoded Float16 values
 	for (size_t i = 0; i < ImageData.Num(); ++i, ++itI, ++itO)
 	{
-		*itO = itI->R.Encoded;
+		*itO = (uint8_t)std::round((float)itI->R.Encoded / 100.f);
 	}
 	return;
 }
@@ -316,20 +304,5 @@ void UDepthComponent::ProcessDepth()
 
 		// Complete Buffer
 		Priv->Buffer->DoneWriting();
-	}
-}
-
-void UDepthComponent::convertDepth(const uint16_t* in, __m128* out) const
-{
-	const size_t size = (Width * Height) / 4;
-	for (size_t i = 0; i < size; ++i, in += 4, ++out)
-	{
-		// Divide by 100 here in order to convert UU (cm) into ROS units (m)
-		*out = _mm_cvtph_ps(
-			_mm_div_epi16(
-				_mm_set_epi16(0, 0, 0, 0, *(in + 3), *(in + 2), *(in + 1), *(in + 0)),
-				_mm_set_epi16(100, 100, 100, 100, 100, 100, 100, 100)
-			)
-		);// / 100;
 	}
 }

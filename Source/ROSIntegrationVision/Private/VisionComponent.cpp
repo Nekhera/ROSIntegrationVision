@@ -34,8 +34,8 @@ public:
 };
 
 UVisionComponent::UVisionComponent() :
-Width(480),
-Height(270),
+Width(960),
+Height(540),
 ServerPort(10000)
 {
     Priv = new PrivateData();
@@ -139,7 +139,6 @@ void UVisionComponent::PublishImages() {
 
 		// Get the data offsets for the different types of images that are in the buffer
 		const uint32_t& OffsetColor = Priv->Buffer->OffsetImage;
-		const uint32_t ColorImageSize = Width * Height * xBytes;
 		UE_LOG(LogTemp, Verbose, TEXT("Buffer Offsets: %d"), OffsetColor);
 
 		TSharedPtr<ROSMessages::sensor_msgs::Image> ImageMessage(new ROSMessages::sensor_msgs::Image());
